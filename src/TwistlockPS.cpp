@@ -23,13 +23,13 @@ long get_process_cpu_time(long pid) {
 	fgets(line, 300, statf);
 	fclose(statf);
 
-	long user, kernel;
+	long user, kernel, user_children, kernel_children;
 	sscanf(line, "%*d %*s %*c %*d %*d %*d %*d %*d %*u %*lu %*lu %*lu %*lu "
 			"%ld %ld "
-			"%*ld %*ld %*ld %*ld %*ld %*ld %*llu %*lu",
-			&user, &kernel);
+			"%ld %ld %*ld %*ld %*ld %*ld %*llu %*lu",
+			&user, &kernel, &user_children, &kernel_children);
 
-	return user + kernel;
+	return user + kernel + user_children + kernel_children;
 }
 
 long get_total_cpu_time() {
@@ -49,10 +49,10 @@ long get_total_cpu_time() {
 	    return -1;
 	}
 
-	long user, nice, system, idle, iowait, irq, softirq;
-	sscanf(line, "%*s %lu %lu %lu %lu %lu %lu %lu", &user, &nice, &system, &idle, &iowait, &irq, &softirq);
+	long user, nice, system, idle;
+	sscanf(line, "%*s %lu %lu %lu %lu %*lu %*lu %*lu", &user, &nice, &system, &idle);
 
-	return user + nice + system + idle + iowait + irq + softirq;
+	return user + nice + system + idle;
 }
 
 void get_cpu_times(std::map<long, long> & cpu_before_times) {
@@ -119,6 +119,24 @@ void parse_memory_line(char* line, char* memory_size) {
 	strncpy(memory_size, p, memory_string_value_size);
 }
 
+int get_cpu_quantity() {
+	FILE* statf = fopen("/proc/stat", "r");
+	if(!statf)
+		return -1;
+
+	char line[5];
+	int result = 0;
+	while (fgets(line, 5, statf)) {
+		if(strncmp(line, "cpu", 3) == 0) {
+			result++;
+		}
+	}
+	fclose(statf);
+	result--; //To ignore the cpu aggregation line
+
+	return result;
+}
+
 double calculate_cpu(std::map<long, long> cpu_before_times, long pid) {
 	std::map<long, long>::iterator pid_before_time_it = cpu_before_times.find(pid);
 
@@ -129,7 +147,7 @@ double calculate_cpu(std::map<long, long> cpu_before_times, long pid) {
 	long ptime = get_process_cpu_time(pid) - pid_before_time_it->second;
 	long ttime = get_total_cpu_time() - cpu_before_times.find(-1)->second;
 
-	return 100 * ptime / ttime;
+	return 100 * get_cpu_quantity() * ptime / ttime;
 }
 
 
@@ -165,6 +183,7 @@ void print_status(long pid, std::map<long, long> cpu_before_times) {
 	if (!vm_size_is_set) {
 		strcpy(memory, "0.0");
 	}
+
 	printf("|%-18s| %12s| %-20s| %-11.3f|\n",
 			get_user_name(strtol(uid, NULL, 10)),
 			memory,
