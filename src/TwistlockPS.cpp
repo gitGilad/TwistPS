@@ -147,7 +147,7 @@ double calculate_cpu(std::map<long, long> cpu_before_times, long pid) {
 	long ptime = get_process_cpu_time(pid) - pid_before_time_it->second;
 	long ttime = get_total_cpu_time() - cpu_before_times.find(-1)->second;
 
-	return 100 * get_cpu_quantity() * ptime / ttime;
+	return 100.0 * get_cpu_quantity() * ptime / ttime;
 }
 
 
